@@ -23,23 +23,23 @@ from PyQt5.QtWidgets import QLineEdit
 from PyQt5.QtWidgets import QGroupBox
 from PyQt5.QtWidgets import QRadioButton
 from PyQt5.QtWidgets import QVBoxLayout
-from PyQt5.QtWidgets import QPushButton 
+from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QCheckBox
-from PyQt5.QtWidgets import QMessageBox  
+from PyQt5.QtWidgets import QMessageBox
 import sys
 import warnings
 
 warnings.simplefilter("ignore", UserWarning)
 sys.coinit_flags = 2
 # fix imports
-import time
-import threading
-import win32api
-from pywinauto import backend
-import pywinauto
 import inspect
+import pywinauto
+from pywinauto import backend
+import win32api
+import threading
+import time
 
-# rewrite with hooks + find in tree
+# TODO rewrite with hooks + find in tree
 def lookForMouse(w):
     desktop = pywinauto.Desktop(backend='uia')
     while True:
@@ -48,7 +48,6 @@ def lookForMouse(w):
             x, y = win32api.GetCursorPos()
             desktop.from_point(x, y).draw_outline()
 
-# TODO check all in win32
 def main():
     app = QApplication(sys.argv)
     app.setStyle('Fusion')
@@ -57,6 +56,7 @@ def main():
     #x = threading.Thread(target=lookForMouse, args=(w,), daemon=True)
     # x.start()
     sys.exit(app.exec_())
+
 
 class InfoDialog(QDialog):
     def __init__(self, title, items, parent=None):
@@ -74,6 +74,7 @@ class InfoDialog(QDialog):
         self.layout.addWidget(listView)
         self.setLayout(self.layout)
         self.resize(400, 300)
+
 
 class ClickInput(QDialog):
     def __init__(self, parent=None):
@@ -125,7 +126,7 @@ class ClickInput(QDialog):
         vbox3 = QVBoxLayout()
         vbox3.addWidget(self.wheel_dist)
 
-        #vbox3.addStretch(1)
+        # vbox3.addStretch(1)
         self.wheel.setLayout(vbox3)
 
         grid.addWidget(self.button, 0, 0)
@@ -141,20 +142,176 @@ class ClickInput(QDialog):
         self.confirm.clicked.connect(self.win_close)
 
     def win_close(self):
-        if self.x.text()=='' and self.y.text()!='' or self.x.text()!='' and self.y.text()=='':
-            QMessageBox.warning(self, "Attention", "Please type coords correctly!")
+        if self.x.text() == '' and self.y.text() != '' or self.x.text() != '' and self.y.text() == '':
+            QMessageBox.warning(self, "Attention",
+                                "Please type coords correctly!")
         else:
             self.close()
+
 
 class MyWindow(QWidget):
     def __init__(self):
         super(MyWindow, self).__init__()
 
         # Methods
-        #print(set([attr for attr in dir(pywinauto.base_wrapper.BaseWrapper)if not attr.startswith('_')]))
-        self.base_methods = {'capture_as_image': self.__capture_as_image, 'children': self.__children, 'click_input': self.__click_input, 'close': self.__close, 'descendants': self.__descendants, 'draw_outline': self.__draw_outline, 'set_focus': self.__set_focus, 'texts': self.__texts,
-                             'type_keys': self.__type_keys, 'wait_enabled': self.__wait_enabled, 'wait_not_enabled': self.__wait_not_enabled, 'wait_not_visible': self.__wait_not_visible, 'wait_visible': self.__wait_visible, 'window_text': self.__window_text}
-
+        # print(set([attr for attr in dir(pywinauto.base_wrapper.BaseWrapper)if not attr.startswith('_')]))
+        # TODO check in win32
+        self.base_methods = {
+            # TODO remove overriden methods
+            #'capture_as_image': self.__capture_as_image,
+            'children': self.__children,
+            'click_input': self.__click_input,
+            'close': self.__close,
+            'descendants': self.__descendants,
+            #'draw_outline': self.__draw_outline,
+            'set_focus': self.__set_focus,
+            'texts': self.__texts,
+            'type_keys': self.__type_keys,
+            'wait_enabled': self.__wait_enabled,
+            'wait_not_enabled': self.__wait_not_enabled,
+            'wait_not_visible': self.__wait_not_visible,
+            'wait_visible': self.__wait_visible,
+            'window_text': self.__window_text
+        }
+        # element_info_win = pywinauto.backend.registry.backends['win32'].element_info_class()
+        # print(set([attr for attr in dir(pywinauto.controls.hwndwrapper.HwndWrapper) if not attr.startswith('_') and not attr[0].isupper() and inspect.ismethod(getattr(pywinauto.controls.hwndwrapper.HwndWrapper(element_info_win), attr))]))
+        self.hwnd_methods = {
+            'full_control_type': None,
+            'set_keyboard_focus': None,
+            'style': None,
+            'set_transparency': None,
+            'context_help_id': None,
+            'popup_window': None,
+            'has_exstyle': None,
+            'control_type': None,
+            'maximize': None,
+            'is_minimized': None,
+            'has_focus': None,
+            'fonts': None,
+            'owner': None,
+            'double_click': None,
+            'font': None,
+            'send_command': None,
+            'menu_item': None,
+            'send_message': None,
+            'menu_select': None,
+            'handle': None,
+            'client_rect': None,
+            'set_application_data': None,
+            'click': None,
+            'right_click': None,
+            'client_rects': None,
+            'send_keystrokes': None,
+            'debug_message': None,
+            'press_mouse': None,
+            'has_keyboard_focus': None,
+            'post_message': None,
+            'move_window': None,
+            'minimize': None,
+            'is_unicode': None,
+            'set_window_text': None,
+            'post_command': None,
+            'exstyle': None,
+            'scroll': None,
+            'get_toolbar': None,
+            'get_focus': None,
+            'is_normal': None,
+            'menu': None,
+            'restore': None,
+            'send_chars': None,
+            'is_maximized': None,
+            'is_active': None,
+            'drag_mouse': None,
+            'get_show_state': None,
+            'has_style': None,
+            'user_data': None,
+            'release_mouse': None,
+            'move_mouse': None,
+            'notify_parent': None,
+            'send_message_timeout': None,
+            'menu_items': None
+        }
+        # print(pywinauto.controls.hwndwrapper.HwndMeta.str_wrappers)
+        self.hwnd_controls_methods = {
+            'hwndwrapper.DialogWrapper': {'client_area_rect': None, 'force_close': None, 'show_in_taskbar': None, 'hide_from_taskbar': None, 'run_tests': None, 'write_to_xml': None, 'is_in_taskbar': None},
+            'win32_controls.ButtonWrapper': {'uncheck_by_click_input': None, 'uncheck_by_click': None, 'check_by_click_input': None, 'get_check_state': None, 'is_checked': None, 'uncheck': None, 'check': None, 'check_by_click': None, 'set_check_indeterminate': None},
+            'win32_controls.ComboBoxWrapper': {'selected_index': None, 'select': None, 'item_count': None, 'dropped_rect': None, 'item_data': None, 'selected_text': None, 'item_texts': None},
+            'win32_controls.ListBoxWrapper': {'set_item_focus': None, 'select': None, 'item_count': None, 'selected_indices': None, 'item_data': None, 'item_rect': None, 'item_texts': None, 'is_single_selection': None, 'get_item_focus': None},
+            'win32_controls.EditWrapper': {'get_line': None, 'select': None, 'line_length': None, 'selection_indices': None, 'line_count': None, 'set_text': None, 'text_block': None, 'set_edit_text': None},
+            'win32_controls.StaticWrapper': {},
+            'win32_controls.PopupMenuWrapper': {},
+            'common_controls.ListViewWrapper': {'items': None, 'get_header_control': None, 'columns': None, 'select': None, 'item_count': None, 'is_focused': None, 'get_column': None, 'get_item_rect': None, 'is_checked': None, 'uncheck': None, 'check': None, 'is_selected': None, 'get_selected_count': None, 'column_widths': None, 'column_count': None, 'item': None, 'get_item': None, 'deselect': None},
+            'common_controls.TreeViewWrapper': {'ensure_visible': None, 'select': None, 'print_items': None, 'item_count': None, 'is_selected': None, 'item': None, 'tree_root': None, 'get_item': None, 'roots': None},
+            'common_controls.HeaderWrapper': {'get_column_text': None, 'get_column_rectangle': None, 'item_count': None},
+            'common_controls.StatusBarWrapper': {'border_widths': None, 'get_part_text': None, 'get_part_rect': None, 'part_right_edges': None, 'part_count': None},
+            'common_controls.TabControlWrapper': {'row_count': None, 'get_tab_text': None, 'tab_count': None, 'get_tab_rect': None, 'select': None, 'get_selected_tab': None},
+            'common_controls.ToolbarWrapper': {'get_button': None, 'get_button_struct': None, 'check_button': None, 'press_button': None, 'get_tool_tips_control': None, 'tip_texts': None, 'get_button_rect': None, 'button': None, 'menu_bar_click_input': None, 'button_count': None},
+            'common_controls.ReBarWrapper': {'get_tool_tips_control': None, 'get_band': None, 'band_count': None},
+            'common_controls.ToolTipsWrapper': {'tool_count': None, 'get_tip': None, 'get_tip_text': None},
+            'common_controls.UpDownWrapper': {'decrement': None, 'set_base': None, 'increment': None, 'set_value': None, 'get_value': None, 'get_base': None, 'get_buddy_control': None, 'get_range': None},
+            'common_controls.TrackbarWrapper': {'set_range_min': None, 'get_line_size': None, 'set_position': None, 'set_line_size': None, 'get_sel_end': None, 'get_page_size': None, 'get_position': None, 'get_sel_start': None, 'set_page_size': None, 'get_num_ticks': None, 'get_tooltips_control': None, 'get_channel_rect': None, 'set_sel': None, 'get_range_min': None, 'get_range_max': None, 'set_range_max': None},
+            'common_controls.AnimationWrapper': {},
+            'common_controls.ComboBoxExWrapper': {},
+            'common_controls.DateTimePickerWrapper': {'set_time': None, 'get_time': None},
+            'common_controls.HotkeyWrapper': {},
+            'common_controls.IPAddressWrapper': {},
+            'common_controls.CalendarWrapper': {'get_view': None, 'set_today': None, 'get_id': None, 'set_current_date': None, 'set_border': None, 'get_today': None, 'get_current_date': None, 'set_day_states': None, 'hit_test': None, 'set_first_weekday': None, 'set_id': None, 'get_month_range': None, 'set_color': None, 'set_view': None, 'calc_min_rectangle': None, 'get_border': None, 'set_month_delta': None, 'place_in_calendar': None, 'get_month_delta': None, 'count': None, 'get_first_weekday': None},
+            'common_controls.PagerWrapper': {'set_position': None, 'get_position': None},
+            'common_controls.ProgressWrapper': {'set_position': None, 'get_step': None, 'step_it': None, 'get_state': None, 'get_position': None}
+        }
+        # element_info_uia = pywinauto.backend.registry.backends['uia'].element_info_class()
+        # print(set([attr for attr in dir(pywinauto.controls.uiawrapper.UIAWrapper) if not attr.startswith('_') and not attr.startswith('iface_') and inspect.ismethod(getattr(pywinauto.controls.uiawrapper.UIAWrapper(element_info_uia), attr))]))
+        self.uia_methods = {
+            'is_selection_required': None,
+            'expand': None,
+            'maximize': None,
+            'is_minimized': None,
+            'menu_select': None,
+            'is_selected': None,
+            'legacy_properties': None,
+            'collapse': None,
+            'set_value': None,
+            'is_keyboard_focusable': None,
+            'has_keyboard_focus': None,
+            'is_expanded': None,
+            'move_window': None,
+            'minimize': None,
+            'selected_item_index': None,
+            'scroll': None,
+            'invoke': None,
+            'can_select_multiple': None,
+            'is_normal': None,
+            'restore': None,
+            'children_texts': None,
+            'is_maximized': None,
+            'is_active': None,
+            'is_collapsed': None,
+            'get_selection': None,
+            'get_show_state': None,
+            'get_expand_state': None,
+            'select': None
+        }
+        # print(pywinauto.controls.uiawrapper.UiaMeta.control_type_to_cls)
+        # pywinauto.windows.uia_defines._build_pattern_ids_dic to check supported controls
+        self.uia_controls_methods = {
+            'uia_controls.WindowWrapper': {},
+            'uia_controls.ButtonWrapper': {'get_toggle_state': None, 'toggle': None, 'click': None},
+            'uia_controls.ComboBoxWrapper': {'item_count': None, 'selected_index': None, 'is_editable': None, 'selected_text': None},
+            'uia_controls.EditWrapper': {'selection_indices': None, 'set_edit_text': None, 'set_window_text': None, 'is_editable': None, 'get_value': None, 'line_count': None, 'set_text': None, 'text_block': None, 'line_length': None, 'get_line': None},
+            'uia_controls.TabControlWrapper': {'tab_count': None, 'get_selected_tab': None},
+            'uia_controls.SliderWrapper': {'small_change': None, 'value': None, 'min_value': None, 'max_value': None, 'large_change': None},
+            'uia_controls.HeaderWrapper': {},
+            'uia_controls.HeaderItemWrapper': {},
+            'uia_controls.ListItemWrapper': {'is_checked': None},
+            'uia_controls.ListViewWrapper': {'item_count': None, 'columns': None, 'items': None, 'get_column': None, 'get_header_controls': None, 'get_items': None, 'get_header_control': None, 'cell': None, 'item': None, 'get_item': None, 'column_count': None, 'cells': None, 'get_item_rect': None, 'get_selected_count': None},
+            'uia_controls.MenuItemWrapper': {'items': None},
+            'uia_controls.MenuWrapper': {'item_by_path': None, 'items': None, 'item_by_index': None},
+            'uia_controls.TooltipWrapper': {},
+            'uia_controls.ToolbarWrapper': {'button': None, 'button_count': None, 'buttons': None, 'check_button': None},
+            'uia_controls.TreeItemWrapper': {'get_child': None, 'is_checked': None, 'ensure_visible': None, 'sub_elements': None},
+            'uia_controls.TreeViewWrapper': {'item_count': None, 'get_item': None, 'roots': None, 'print_items': None},
+            'uia_controls.StaticWrapper': {}
+        }
         self.setMinimumSize(1000, 500)
         self.setLocale(QLocale(QLocale.English, QLocale.UnitedStates))
         self.setWindowTitle(
@@ -178,9 +335,10 @@ class MyWindow(QWidget):
         self.action.addAction(self.mouse)
         self.action.addAction(default)
         self.action.addSeparator()
-        self.bmethods = self.action.addMenu("Base Methods")
-        # (uia_defines.py/_build_pattern_ids_dic)
-        self.cmethods = self.action.addMenu('Current Elem Methods')
+        self.bmethods = self.action.addMenu("Base Wrapper Methods")
+        self.hmethods = self.action.addMenu("Hwnd/Win32 Wrapper Methods")
+        self.umethods = self.action.addMenu("UIA Wrapper Methods")
+        self.cmethods = self.action.addMenu('Current Wrapper Unique Methods')
 
         # Backend label
         self.backendLabel = QLabel("Backend Type")
@@ -201,6 +359,7 @@ class MyWindow(QWidget):
 
         self.tree_view = QTreeView()
         self.tree_view.setColumnWidth(0, 150)
+        self.tree_view.clicked.connect(self.__show_property)
 
         self.comboBox.setCurrentText('uia')
         self.current_elem_wrapper = None
@@ -224,7 +383,6 @@ class MyWindow(QWidget):
         self.tree_model = MyTreeModel(self.element_info, _backend)
         self.tree_model.setHeaderData(0, Qt.Horizontal, 'Controls')
         self.tree_view.setModel(self.tree_model)
-        self.tree_view.clicked.connect(self.__show_property)
 
     def __show_tree(self, text):
         backend = text
@@ -234,18 +392,63 @@ class MyWindow(QWidget):
     def __show_property(self, index=None):
         data = index.data()
         self.current_elem_info = self.tree_model.info_dict.get(data)
+        self.bmethods.clear()
+        for method in self.base_methods.keys():
+            action = QAction(method + '()', self)
+            action.triggered.connect(self.base_methods[method])
+            self.bmethods.addAction(action)
+        # TODO try methods[backend][wrapper][method]
         if self.comboBox.currentText() == 'win32':
             self.current_elem_wrapper = pywinauto.controls.hwndwrapper.HwndWrapper(
                 self.current_elem_info)
+            self.hmethods.clear()
+            for method in self.hwnd_methods.keys():
+                # if while not all implemented
+                if self.hwnd_methods[method] != None:
+                    action = QAction(method + '()', self)
+                    action.triggered.connect(self.hwnd_methods[method])
+                    self.hmethods.addAction(action)
+            self.cmethods.clear()
+            wrapper = str(self.current_elem_wrapper).split('-')[0][:-1]
+            if wrapper!='hwndwrapper.HwndWrapper':
+                if wrapper in self.hwnd_controls_methods.keys():
+                    # DEBUG
+                    print('found win32!')
+                    for method in self.hwnd_controls_methods[wrapper].keys():
+                        # if while not all implemented
+                        if self.hwnd_controls_methods[wrapper][method] != None:
+                            action = QAction(method + '()', self)
+                            action.triggered.connect(
+                                self.hwnd_controls_methods[wrapper][method])
+                            self.cmethods.addAction(action)
+                else:
+                    print('Unknown wrapper: ' + wrapper)
         elif self.comboBox.currentText() == 'uia':
             self.current_elem_wrapper = pywinauto.controls.uiawrapper.UIAWrapper(
                 self.current_elem_info)
-            # autogenerate methods
-            self.bmethods.clear()
-            for method in self.base_methods.keys():
-                action = QAction(method + '()', self)
-                action.triggered.connect(self.base_methods[method])
-                self.bmethods.addAction(action)
+            self.umethods.clear()
+            for method in self.uia_methods.keys():
+                # if while not all implemented
+                if self.uia_methods[method] != None:
+                    action = QAction(method + '()', self)
+                    action.triggered.connect(self.uia_methods[method])
+                    self.umethods.addAction(action)
+            self.cmethods.clear()
+            wrapper = str(self.current_elem_wrapper).split('-')[0][:-1]
+            if wrapper!='uiawrapper.UIAWrapper':
+                if wrapper in self.uia_controls_methods.keys():
+                    # DEBUG
+                    print('found uia!')
+                    for method in self.uia_controls_methods[wrapper].keys():
+                        # if while not all implemented
+                        if self.uia_controls_methods[wrapper][method] != None:
+                            action = QAction(method + '()', self)
+                            action.triggered.connect(
+                                self.uia_controls_methods[wrapper][method])
+                            self.cmethods.addAction(action)
+                else:
+                    print('Unknown wrapper: ' + wrapper)
+
         # Debug
         print(self.current_elem_wrapper)
         # Unique methods
@@ -275,7 +478,7 @@ class MyWindow(QWidget):
         else:
             pass
 
-    # Base Methods
+    # Base Wrapper Methods
     def __capture_as_image(self):
         img = self.current_elem_wrapper.capture_as_image()
         if img != None:
@@ -284,29 +487,30 @@ class MyWindow(QWidget):
             print('can not capture as image')
 
     def __children(self):
-        dlg=InfoDialog('children()', self.current_elem_wrapper.children(), self)
+        dlg = InfoDialog(
+            'children()', self.current_elem_wrapper.children(), self)
         dlg.exec()
-
 
     def __click_input(self):
-        dlg=ClickInput(self)
+        dlg = ClickInput(self)
         dlg.exec()
         button = 'left'
-        coords=(None,None)
+        coords = (None, None)
         double = False
         wheel_dist = 0
         if dlg.right.isChecked():
-            button='right'
+            button = 'right'
         elif dlg.middle.isChecked():
-            button='middle'
-        if dlg.x.text()!='':
-            coords=(int(dlg.x.text()),int(dlg.y.text()))
+            button = 'middle'
+        if dlg.x.text() != '':
+            coords = (int(dlg.x.text()), int(dlg.y.text()))
         if dlg.double.isChecked():
-            double=True
-        if dlg.wheel_dist.text()!='':
-            wheel_dist=int(dlg.wheel_dist.text())
-        self.current_elem_wrapper.click_input(button=button, coords=coords, double=double, wheel_dist=wheel_dist)
-    
+            double = True
+        if dlg.wheel_dist.text() != '':
+            wheel_dist = int(dlg.wheel_dist.text())
+        self.current_elem_wrapper.click_input(
+            button=button, coords=coords, double=double, wheel_dist=wheel_dist)
+
     def __close(self):
         if self.current_elem_wrapper:
             if self.current_elem_wrapper.is_dialog():
@@ -314,7 +518,8 @@ class MyWindow(QWidget):
                 self.__refresh()
 
     def __descendants(self):
-        dlg=InfoDialog('descendants()', self.current_elem_wrapper.descendants(), self)
+        dlg = InfoDialog(
+            'descendants()', self.current_elem_wrapper.descendants(), self)
         dlg.exec()
 
     def __draw_outline(self):
@@ -324,11 +529,11 @@ class MyWindow(QWidget):
         self.current_elem_wrapper.set_focus()
 
     def __texts(self):
-        dlg=InfoDialog('texts()', self.current_elem_wrapper.texts(), self)
+        dlg = InfoDialog('texts()', self.current_elem_wrapper.texts(), self)
         dlg.exec()
 
     def __type_keys(self):
-        # show dialog to choose keys
+        # TODO show dialog to choose keys
         self.current_elem_wrapper.type_keys()
 
     def __wait_enabled(self):
@@ -344,13 +549,22 @@ class MyWindow(QWidget):
         self.current_elem_wrapper.wait_visible()
 
     def __window_text(self):
-        dlg=InfoDialog('window_text', [self.current_elem_wrapper.window_text()], self)
+        dlg = InfoDialog(
+            'window_text', [self.current_elem_wrapper.window_text()], self)
         dlg.exec()
 
     def closeEvent(self, event):
         geometry = self.saveGeometry()
         self.settings.setValue('Geometry', geometry)
         super(MyWindow, self).closeEvent(event)
+
+    # Hwnd/Win32 Wrapper Methods
+
+    # Hwnd Controls Wrappers Methods
+
+    # UIA Wrapper Methods
+
+    # UIA Controls Wrappers Methods
 
 
 class MyTreeModel(QStandardItemModel):
