@@ -8,6 +8,7 @@ from PyQt5.QtGui import QStandardItemModel
 from PyQt5.QtGui import QStandardItem
 from PyQt5.QtGui import QIntValidator
 from PyQt5.QtGui import QFont
+from PyQt5.QtCore import QSortFilterProxyModel
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtWidgets import QWidget
 from PyQt5.QtWidgets import QGridLayout
@@ -31,6 +32,7 @@ from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtWidgets import QTextEdit
 from PyQt5.QtWidgets import QFileDialog
 from PyQt5.QtWidgets import QHeaderView
+from PyQt5.QtWidgets import QCompleter
 import sys
 import warnings
 
@@ -38,8 +40,9 @@ warnings.simplefilter("ignore", UserWarning)
 sys.coinit_flags = 2
 # TODO fix imports
 import inspect
+import psutil
 import pywinauto
-from pywinauto import backend
+from pywinauto import backend, Application
 import win32api
 import threading
 import time
@@ -316,6 +319,12 @@ class MyWindow(QWidget):
                     'uia_controls.StaticWrapper': {}
                 }
             },
+            'wpf': {
+                'backend_methods': {
+                },
+                'controls_methods': {
+                }
+            },
             'ax': {
                 'backend_methods': {
                 },
@@ -368,12 +377,15 @@ class MyWindow(QWidget):
         self.hmethods.menuAction().setVisible(False)
         self.umethods = self.action.addMenu("UIA Wrapper Methods")
         self.umethods.menuAction().setVisible(False)
+        self.wpfmethods = self.action.addMenu("WPF Wrapper Methods")
+        self.wpfmethods.menuAction().setVisible(False)
         self.amethods = self.action.addMenu("AX Wrapper Methods")
         self.amethods.menuAction().setVisible(False)
         self.backend_menus = {
             'last_used': self.umethods,
             'win32': self.hmethods,
             'uia': self.umethods,
+            'wpf': self.wpfmethods,
             'ax': self.amethods,
             # TODO HOW TO ADD BACKEND
             'other backend': 'self.other_backend_menu'
@@ -383,6 +395,7 @@ class MyWindow(QWidget):
         self.backend_wrappers = {
             'win32': 'hwndwrapper.HwndWrapper',
             'uia': 'uiawrapper.UIAWrapper',
+            'wpf': 'wpfwrapper.WPFWrapper',
             'ax': 'ax_wrapper.AXWrapper',
             # TODO HOW TO ADD BACKEND
             'other backend': 'other backend wrapper name'
@@ -390,6 +403,7 @@ class MyWindow(QWidget):
         self.backend_inits = {
             'win32': pywinauto.controls.hwndwrapper.HwndWrapper,
             'uia': pywinauto.controls.uiawrapper.UIAWrapper,
+            'wpf': pywinauto.controls.wpfwrapper.WPFWrapper,
             # TODO uncomment and replace "None" when implemented in pywinauto
             'ax': None, #pywinauto.controls.ax_wrapper.AXWrapper,
             # TODO HOW TO ADD BACKEND
@@ -436,11 +450,25 @@ class MyWindow(QWidget):
         # Table view
         self.table_view = QTableView()
 
+        # Widgets for process-specific backends
+        self.processComboBox = AutocompletionComboBox()
+        self.processComboBox.setEnabled(False)
+        self.processComboBox.setMaxVisibleItems(30)
+
+        self.processConnectButton = QPushButton("Connect")
+        self.processConnectButton.setEnabled(False)
+        self.processConnectButton.clicked.connect(lambda: self.__initialize_calc(_backend='wpf'))
+
+        self.processComboBox.currentIndexChanged.connect(self.on_process_selected)
+        self.__init_process_list_combobox()
+
         # Add top widgets to main window
         self.grid_tree = QGridLayout()
         self.grid_tree.addWidget(self.backendLabel, 0, 0, 1, 1)
         self.grid_tree.addWidget(self.comboBox, 0, 1, 1, 1)
-        self.grid_tree.addWidget(self.tree_view, 1, 0, 1, 2)
+        self.grid_tree.addWidget(self.processComboBox, 0, 3, 1, 1)
+        self.grid_tree.addWidget(self.processConnectButton, 0, 4, 1, 1)
+        self.grid_tree.addWidget(self.tree_view, 1, 0, 1, 5)
         self.tree = QGroupBox('Controls View')
         self.tree.setLayout(self.grid_tree)
 
@@ -463,9 +491,26 @@ class MyWindow(QWidget):
         geometry = self.settings.value('Geometry', bytes('', 'utf-8'))
         self.restoreGeometry(geometry)
 
+    def __init_process_list_combobox(self):
+        self.processComboBox.clear()
+        process_list = []
+        for proc in psutil.process_iter():
+            process_string = '{} ({})'.format(proc.name(), proc.pid)
+            process_list.append(process_string)
+            self.processComboBox.addItem(process_string, proc.pid)
+
+    def on_process_selected(self, index):
+        pid = self.processComboBox.itemData(index)
+        self.processConnectButton.setText('Connect to {}'.format(pid))
+
     def __initialize_calc(self, _backend='uia'):
-        self.element_info \
-            = backend.registry.backends[_backend].element_info_class()
+        if _backend != 'wpf':
+            self.element_info \
+                = backend.registry.backends[_backend].element_info_class()
+        else:
+            _pid = self.processComboBox.currentData()
+            self.element_info \
+                = backend.registry.backends[_backend].element_info_class(pid=_pid)
         self.tree_model = MyTreeModel(self.element_info, _backend)
         self.tree_model.setHeaderData(0, Qt.Horizontal, 'Controls')
         self.tree_view.setModel(self.tree_model)
@@ -473,7 +518,18 @@ class MyWindow(QWidget):
     def __show_tree(self, text):
         backend = text
         self.current_elem_wrapper = None
-        self.__initialize_calc(backend)
+        self.tree_view.setModel(None)
+        self.table_view.setModel(None)
+        self.tree_model = None
+
+        if backend == 'wpf':
+            self.processComboBox.setEnabled(True)
+            self.processConnectButton.setEnabled(True)
+        else:
+            self.processComboBox.setEnabled(False)
+            self.processConnectButton.setEnabled(False)
+
+            self.__initialize_calc(backend)
 
     def __show_property(self, index=None):
         data = index.data()
@@ -624,7 +680,10 @@ class MyWindow(QWidget):
     # Actions
     def __refresh(self):
         self.current_elem_wrapper = None
-        self.__initialize_calc(str(self.comboBox.currentText()))
+        if self.tree_model is not None:
+            self.__initialize_calc(str(self.comboBox.currentText()))
+        if str(self.comboBox.currentText()) == 'wpf':
+            self.__init_process_list_combobox()
 
     def __default(self):
         # TODO add write method?
@@ -1014,7 +1073,7 @@ class MyTreeModel(QStandardItemModel):
             self.__get_next(child, child_item)
 
     def __node_name(self, element_info):
-        if 'uia' == self.backend:
+        if self.backend in ('uia', 'wpf'):
             return '%s "%s" (%s)' % (str(element_info.control_type),
                                      str(element_info.name),
                                      id(element_info))
@@ -1064,8 +1123,19 @@ class MyTreeModel(QStandardItemModel):
             ['top_level_parent', str(element_info.top_level_parent)]
         ] if (self.backend == 'uia') else []
 
+        props_wpf = [
+            ['value', str(element_info.value)],
+            ['auto_id', str(element_info.auto_id)],
+            ['control_type', str(element_info.control_type)],
+            ['framework_id', str(element_info.framework_id)],
+            ['runtime_id', str(element_info.runtime_id)],
+            ['parent', str(element_info.parent)],
+            ['top_level_parent', str(element_info.top_level_parent)]
+        ] if (self.backend == 'wpf') else []
+
         props.extend(props_uia)
         props.extend(props_win32)
+        props.extend(props_wpf)
         node_dict = {self.__node_name(element_info): props}
         self.props_dict.update(node_dict)
         self.info_dict.update({self.__node_name(element_info): element_info})
@@ -1095,6 +1165,37 @@ class MyTableModel(QAbstractTableModel):
             return self.header_labels[section]
         return QAbstractTableModel.headerData(self, section, orientation, role)
 
+
+class AutocompletionComboBox(QComboBox):
+    """Editable combobox with autocompletion and filtering"""
+    # based on https://stackoverflow.com/a/50639066/
+    def __init__(self, parent=None):
+        super(AutocompletionComboBox, self).__init__(parent)
+
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setEditable(True)
+
+        # add a filter model to filter matching items
+        self.pFilterModel = QSortFilterProxyModel(self)
+        self.pFilterModel.setFilterCaseSensitivity(Qt.CaseInsensitive)
+        self.pFilterModel.setSourceModel(self.model())
+
+        # add a completer, which uses the filter model
+        self.completer = QCompleter(self.pFilterModel, self)
+        # always show all (filtered) completions
+        self.completer.setCompletionMode(QCompleter.UnfilteredPopupCompletion)
+        self.setCompleter(self.completer)
+
+        # connect signals
+        self.lineEdit().textEdited.connect(self.pFilterModel.setFilterFixedString)
+        self.completer.activated.connect(self.on_completer_activated)
+
+    # on selection of an item from the completer, select the corresponding item from combobox
+    def on_completer_activated(self, text):
+        if text:
+            index = self.findText(text)
+            self.setCurrentIndex(index)
+            self.activated[str].emit(self.itemText(index))
 
 if __name__ == "__main__":
     main()
