@@ -78,13 +78,22 @@ class MyWindow(QWidget):
         geometry = self.settings.value('Geometry', bytes('', 'utf-8'))
         self.restoreGeometry(geometry)
 
-    def __initialize_calc(self, _backend='uia'):
-        self.element_info \
-            = backend.registry.backends[_backend].element_info_class()
-        self.tree_model = MyTreeModel(self.element_info, _backend)
-        self.tree_model.setHeaderData(0, Qt.Horizontal, 'Controls')
-        self.tree_view.setModel(self.tree_model)
-        self.tree_view.clicked.connect(self.__show_property)
+    if sys.platform.startswith("linux"):
+        def __initialize_calc(self, _backend='atspi'):
+            self.element_info \
+                = backend.registry.backends[_backend].element_info_class()
+            self.tree_model = MyTreeModel(self.element_info, _backend)
+            self.tree_model.setHeaderData(0, Qt.Horizontal, 'Controls')
+            self.tree_view.setModel(self.tree_model)
+            self.tree_view.clicked.connect(self.__show_property)
+    else:
+        def __initialize_calc(self, _backend='uia'):
+            self.element_info \
+                = backend.registry.backends[_backend].element_info_class()
+            self.tree_model = MyTreeModel(self.element_info, _backend)
+            self.tree_model.setHeaderData(0, Qt.Horizontal, 'Controls')
+            self.tree_view.setModel(self.tree_model)
+            self.tree_view.clicked.connect(self.__show_property)
 
     def __show_tree(self, text):
         backend = text
@@ -130,6 +139,10 @@ class MyTreeModel(QStandardItemModel):
             return '%s "%s" (%s)' % (str(element_info.control_type),
                                      str(element_info.name),
                                      id(element_info))
+        elif 'atspi' == self.backend:
+            return '%s "%s" (%s)' % (str(element_info.control_type),
+                                     str(element_info.name),
+                                     id(element_info))
         return '"%s" (%s)' % (str(element_info.name), id(element_info))
 
     def __generate_props_dict(self, element_info):
@@ -156,8 +169,14 @@ class MyTreeModel(QStandardItemModel):
                         ['runtime_id', str(element_info.runtime_id)]
                     ] if (self.backend == 'uia') else []
 
+        props_atspi = [
+                        ['control_type', str(element_info.control_type)],
+                        ['runtime_id', str(element_info.runtime_id)]
+                    ] if (self.backend == 'atspi') else []
+
         props.extend(props_uia)
         props.extend(props_win32)
+        props.extend(props_atspi)
         node_dict = {self.__node_name(element_info): props}
         self.props_dict.update(node_dict)
 
