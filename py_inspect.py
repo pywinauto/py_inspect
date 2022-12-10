@@ -1,3 +1,5 @@
+import pywinauto
+from pywinauto import backend
 from PyQt5.QtCore import QLocale
 from PyQt5.QtCore import QCoreApplication
 from PyQt5.QtCore import QSettings
@@ -36,30 +38,13 @@ import warnings
 
 warnings.simplefilter("ignore", UserWarning)
 sys.coinit_flags = 2
-# TODO fix imports
-import inspect
-import pywinauto
-from pywinauto import backend
-import win32api
-import threading
-import time
 
-# TODO rewrite with hooks + find in tree
-def lookForMouse(w):
-    desktop = pywinauto.Desktop(backend='uia')
-    while True:
-        time.sleep(0.5)
-        if w.mouse.isChecked():
-            x, y = win32api.GetCursorPos()
-            desktop.from_point(x, y).draw_outline()
 
 def main():
     app = QApplication(sys.argv)
     app.setStyle('Fusion')
     w = MyWindow()
     w.show()
-    #x = threading.Thread(target=lookForMouse, args=(w,), daemon=True)
-    # x.start()
     sys.exit(app.exec_())
 
 
@@ -164,12 +149,12 @@ class MyWindow(QWidget):
         # Methods
         self.base_methods = {
             # TODO remove overriden methods
-            #'capture_as_image': self.__capture_as_image,
+            # 'capture_as_image': self.__capture_as_image,
             'children': self.__children,
             'click_input': self.__click_input,
             'close': self.__close,
             'descendants': self.__descendants,
-            #'draw_outline': self.__draw_outline,
+            # 'draw_outline': self.__draw_outline,
             'set_focus': self.__set_focus,
             'texts': self.__texts,
             'type_keys': self.__type_keys,
@@ -334,7 +319,7 @@ class MyWindow(QWidget):
                 }
             }
         }
-        
+
         # TODO try resize instead
         self.setMinimumSize(1024, 768)
         self.setLocale(QLocale(QLocale.English, QLocale.UnitedStates))
@@ -351,13 +336,10 @@ class MyWindow(QWidget):
         # Menu bar
         self.menu_bar = QMenuBar(self)
         self.action = self.menu_bar.addMenu("Actions")
-        refresh = QAction('Refresh', self)
-        refresh.triggered.connect(self.__refresh)
         self.mouse = QAction('Find by mouse', self)
         self.mouse.setCheckable(True)
         default = QAction('Default Action', self)
         default.triggered.connect(self.__default)
-        self.action.addAction(refresh)
         self.action.addAction(self.mouse)
         self.action.addAction(default)
         self.action.addSeparator()
@@ -383,15 +365,14 @@ class MyWindow(QWidget):
         self.backend_wrappers = {
             'win32': 'hwndwrapper.HwndWrapper',
             'uia': 'uiawrapper.UIAWrapper',
-            'ax': 'ax_wrapper.AXWrapper',
+            'ax': 'atspiwrapper.AtspiWrapper',
             # TODO HOW TO ADD BACKEND
             'other backend': 'other backend wrapper name'
         }
         self.backend_inits = {
             'win32': pywinauto.controls.hwndwrapper.HwndWrapper,
             'uia': pywinauto.controls.uiawrapper.UIAWrapper,
-            # TODO uncomment and replace "None" when implemented in pywinauto
-            'ax': None, #pywinauto.controls.ax_wrapper.AXWrapper,
+            'ax': pywinauto.controls.atspiwrapper.AtspiWrapper,
             # TODO HOW TO ADD BACKEND
             'other backend': 'other backend wrapper class name'
         }
@@ -405,6 +386,10 @@ class MyWindow(QWidget):
         self.comboBox.setMaxVisibleItems(5)
         self.comboBox.setObjectName("comboBox")
         self.comboBox.activated[str].connect(self.__show_tree)
+
+        # Refresh button
+        self.refresh = QPushButton('Refresh')
+        self.refresh.clicked.connect(self.__refresh)
 
         # Tree view
         self.tree_view = QTreeView()
@@ -440,7 +425,8 @@ class MyWindow(QWidget):
         self.grid_tree = QGridLayout()
         self.grid_tree.addWidget(self.backendLabel, 0, 0, 1, 1)
         self.grid_tree.addWidget(self.comboBox, 0, 1, 1, 1)
-        self.grid_tree.addWidget(self.tree_view, 1, 0, 1, 2)
+        self.grid_tree.addWidget(self.refresh, 0, 2, 1, 1)
+        self.grid_tree.addWidget(self.tree_view, 1, 0, 1, 3)
         self.tree = QGroupBox('Controls View')
         self.tree.setLayout(self.grid_tree)
 
@@ -472,14 +458,16 @@ class MyWindow(QWidget):
 
     def __show_tree(self, text):
         backend = text
-        self.current_elem_wrapper = None
-        self.__initialize_calc(backend)
+        if str(self.comboBox.currentText()) != backend:
+            self.current_elem_wrapper = None
+            self.__initialize_calc(backend)
 
     def __show_property(self, index=None):
         data = index.data()
         current_backend = self.comboBox.currentText()
         self.current_elem_info = self.tree_model.info_dict.get(data)
-        self.current_elem_wrapper = self.backend_inits[current_backend](self.current_elem_info)
+        self.current_elem_wrapper = self.backend_inits[current_backend](
+            self.current_elem_info)
 
         self.bmethods.clear()
         for method in self.base_methods.keys():
@@ -492,11 +480,12 @@ class MyWindow(QWidget):
         self.backend_menus[current_backend].clear()
         self.backend_menus[current_backend].menuAction().setVisible(True)
         for method in self.backend_methods[current_backend]['backend_methods'].keys():
-                # if while not all implemented
-                if self.backend_methods[current_backend]['backend_methods'][method] != None:
-                    action = QAction(method + '()', self)
-                    action.triggered.connect(self.backend_methods[current_backend]['backend_methods'][method])
-                    self.backend_menus[current_backend].addAction(action)
+            # if while not all implemented
+            if self.backend_methods[current_backend]['backend_methods'][method] != None:
+                action = QAction(method + '()', self)
+                action.triggered.connect(
+                    self.backend_methods[current_backend]['backend_methods'][method])
+                self.backend_menus[current_backend].addAction(action)
 
         wrapper = str(self.current_elem_wrapper).split('-')[0][:-1]
         if wrapper != self.backend_wrappers[current_backend]:
@@ -506,31 +495,41 @@ class MyWindow(QWidget):
                     # if while not all implemented
                     if self.backend_methods[current_backend]['controls_methods'][wrapper][method] != None:
                         action = QAction(method + '()', self)
-                        action.triggered.connect(self.backend_methods[current_backend]['controls_methods'][wrapper][method])
+                        action.triggered.connect(
+                            self.backend_methods[current_backend]['controls_methods'][wrapper][method])
                         self.cmethods.addAction(action)
             else:
-                dlg = InfoDialog('Not implemented yet', 'Unknown wrapper: ' + wrapper, self)
+                dlg = InfoDialog('Not implemented yet',
+                                 'Unknown wrapper: ' + wrapper, self)
                 dlg.exec()
 
         self.table_model \
             = MyTableModel(self.tree_model.props_dict.get(data), self)
         self.table_view.wordWrap()
         self.table_view.setModel(self.table_model)
-        header = self.table_view.horizontalHeader()       
+        header = self.table_view.horizontalHeader()
         header.setSectionResizeMode(1, QHeaderView.Stretch)
-    
+
+    def __refresh(self):
+        self.current_elem_wrapper = None
+        self.tree_model = MyTreeModel(
+            self.element_info, str(self.comboBox.currentText()))
+        self.tree_model.setHeaderData(0, Qt.Horizontal, 'Controls')
+        self.tree_view.setModel(self.tree_model)
+
     def __clear_edit(self):
         self.edit.clear()
         self.used_apps = {}
         self.flags = 0
 
     def __save_edit(self):
-        save_file = QFileDialog.getSaveFileName(None, 'SaveTextFile', '/', "Python Script (*.py)")
+        save_file = QFileDialog.getSaveFileName(
+            None, 'SaveTextFile', '/', "Python Script (*.py)")
         text = self.edit.toPlainText()
-        if save_file[0]: 
+        if save_file[0]:
             with open(save_file[0], 'w', encoding='utf8') as file:
                 file.write(text)
-    
+
     def __write_method(self, method, ret):
         if len(self.used_apps) == 0:
             self.edit.append('from pywinauto.application import Application\n')
@@ -544,25 +543,28 @@ class MyWindow(QWidget):
 
         # check if already used
         if top_parent.process_id not in self.used_apps.keys():
-            self.used_apps[top_parent.process_id] = 'app_{}'.format(len(self.used_apps) + 1)
+            self.used_apps[top_parent.process_id] = 'app_{}'.format(
+                len(self.used_apps) + 1)
             if self.script_mode.currentText() == 'connect to app mode':
-                args=''
+                args = ''
                 if top_parent.process_id:
-                    args='pid=' + str(top_parent.process_id)
+                    args = 'pid=' + str(top_parent.process_id)
                 elif top_parent.handle:
-                    args='handle=' + str(top_parent.handle)
+                    args = 'handle=' + str(top_parent.handle)
                 else:
                     # TODO same as start mode
                     args = 'cannot find app'
-                self.edit.append(self.used_apps[top_parent.process_id] + ' = Application(backend="{}").connect({})\n'.format(self.comboBox.currentText(), args))
+                self.edit.append(self.used_apps[top_parent.process_id] +
+                                 ' = Application(backend="{}").connect({})\n'.format(self.comboBox.currentText(), args))
             elif self.script_mode.currentText() == 'start .exe mode':
                 # TODO start correct app name
-                self.edit.append(self.used_apps[top_parent.process_id] + ' = Application(backend="{}").start("{}")\n'.format(self.comboBox.currentText(), 'type correct argument for start()'))
+                self.edit.append(self.used_apps[top_parent.process_id] + ' = Application(backend="{}").start("{}")\n'.format(
+                    self.comboBox.currentText(), 'type correct argument for start()'))
         command = str(self.used_apps[top_parent.process_id])
         # TODO try optimal search for controls with pre-run script
         window = path[len(path)-1]
         path = path[:-1]
-        window_props=''
+        window_props = ''
         if window.name:
             window_props += 'name="{}", '.format(window.name)
         if window.class_name:
@@ -572,7 +574,8 @@ class MyWindow(QWidget):
         if window_props == '':
             if self.comboBox.currentText() == 'uia':
                 if window.control_type:
-                    window_props += 'control_type="{}", '.format(window.control_type)
+                    window_props += 'control_type="{}", '.format(
+                        window.control_type)
                 if window.auto_id:
                     window_props += 'auto_id="{}", '.format(window.auto_id)
                 if window_props == '':
@@ -583,9 +586,9 @@ class MyWindow(QWidget):
                 window_props = 'cannot find control by name, class_name or control_id, try other props'
         else:
             window_props = window_props[:-2]
-        command+= '.window({}, top_level_only=False)'.format(window_props)
+        command += '.window({}, top_level_only=False)'.format(window_props)
         for ctrl in path[::-1]:
-            ctrl_props=''
+            ctrl_props = ''
             if ctrl.name:
                 ctrl_props += 'name="{}", '.format(ctrl.name)
             if ctrl.class_name:
@@ -595,7 +598,8 @@ class MyWindow(QWidget):
             if ctrl_props == '':
                 if self.comboBox.currentText() == 'uia':
                     if ctrl.control_type:
-                        ctrl_props += 'control_type="{}", '.format(ctrl.control_type)
+                        ctrl_props += 'control_type="{}", '.format(
+                            ctrl.control_type)
                     if ctrl.auto_id:
                         ctrl_props += 'auto_id="{}", '.format(ctrl.auto_id)
                     if ctrl_props == '':
@@ -606,8 +610,8 @@ class MyWindow(QWidget):
                     ctrl_props = 'cannot find control by name, class_name or control_id, try other props'
             else:
                 ctrl_props = ctrl_props[:-2]
-            command+= '.by({})'.format(ctrl_props)
-        command+= '.' + method
+            command += '.by({})'.format(ctrl_props)
+        command += '.' + method
         if ret == 'execute':
             self.edit.append(command + '\n')
         elif ret == 'print':
@@ -615,16 +619,13 @@ class MyWindow(QWidget):
         elif ret == 'check':
             self.edit.append('flag_{} = {}\n'.format(self.flags, command))
             self.flags += 1
-    
+
     def closeEvent(self, event):
         geometry = self.saveGeometry()
         self.settings.setValue('Geometry', geometry)
         super(MyWindow, self).closeEvent(event)
 
     # Actions
-    def __refresh(self):
-        self.current_elem_wrapper = None
-        self.__initialize_calc(str(self.comboBox.currentText()))
 
     def __default(self):
         # TODO add write method?
@@ -639,7 +640,7 @@ class MyWindow(QWidget):
 
     # Base Wrapper Methods
 
-    #def __capture_as_image(self):
+    # def __capture_as_image(self):
     #    img = self.current_elem_wrapper.capture_as_image()
     #    if img != None:
     #        img.show()
@@ -670,7 +671,8 @@ class MyWindow(QWidget):
             double = True
         if dlg.wheel_dist.text() != '':
             wheel_dist = int(dlg.wheel_dist.text())
-        self.__write_method('click_input(button=' + button + ', coords=' + str(coords) + ', double=' + str(double) + ', wheel_dist=' + str(wheel_dist) + ')', 'execute')
+        self.__write_method('click_input(button=' + button + ', coords=' + str(coords) +
+                            ', double=' + str(double) + ', wheel_dist=' + str(wheel_dist) + ')', 'execute')
         self.current_elem_wrapper.click_input(
             button=button, coords=coords, double=double, wheel_dist=wheel_dist)
 
@@ -691,7 +693,7 @@ class MyWindow(QWidget):
         dlg.exec()
         self.__write_method('descendants()', 'print')
 
-    #def __draw_outline(self):
+    # def __draw_outline(self):
     #    self.current_elem_wrapper.draw_outline()
 
     def __set_focus(self):
@@ -857,7 +859,7 @@ class MyWindow(QWidget):
 
     def __win32_restore(self):
         pass
-    
+
     def __win32_right_click(self):
         pass
 
@@ -893,7 +895,7 @@ class MyWindow(QWidget):
 
     def __win32_style(self):
         pass
-    
+
     def __win32_user_data(self):
         pass
 
@@ -909,13 +911,13 @@ class MyWindow(QWidget):
 
     def __uia_collapse(self):
         pass
-    
+
     def __uia_expand(self):
         pass
 
     def __uia_get_expand_state(self):
         pass
-    
+
     def __uia_get_selection(self):
         pass
 
@@ -930,7 +932,7 @@ class MyWindow(QWidget):
 
     def __uia_is_active(self):
         pass
-    
+
     def __uia_is_collapsed(self):
         pass
 
@@ -945,10 +947,10 @@ class MyWindow(QWidget):
 
     def __uia_is_minimized(self):
         pass
-    
+
     def __uia_is_normal(self):
         pass
-    
+
     def __uia_is_selected(self):
         pass
 
@@ -956,7 +958,7 @@ class MyWindow(QWidget):
         pass
 
     def __uia_legacy_properties(self):
-        pass    
+        pass
 
     def __uia_maximize(self):
         pass
@@ -991,6 +993,7 @@ class MyWindow(QWidget):
 
     # AX Controls Wrappers Methods
 
+
 class MyTreeModel(QStandardItemModel):
     def __init__(self, element_info, backend):
         QStandardItemModel.__init__(self)
@@ -1022,25 +1025,25 @@ class MyTreeModel(QStandardItemModel):
 
     def __generate_props_dict(self, element_info):
         props = [
-                    ['control_id', str(element_info.control_id)],
-                    ['class_name', str(element_info.class_name)],
-                    ['enabled', str(element_info.enabled)],
-                    ['name', str(element_info.name)],
-                    ['process_id', str(element_info.process_id)],
-                    ['rectangle', str(element_info.rectangle)],
-                    ['rich_text', str(element_info.rich_text)],
-                    ['visible', str(element_info.visible)]
-                ] if (self.backend == 'ax') else [
-                    ['control_id', str(element_info.control_id)],
-                    ['class_name', str(element_info.class_name)],
-                    ['enabled', str(element_info.enabled)],
-                    ['handle', str(element_info.handle)],
-                    ['name', str(element_info.name)],
-                    ['process_id', str(element_info.process_id)],
-                    ['rectangle', str(element_info.rectangle)],
-                    ['rich_text', str(element_info.rich_text)],
-                    ['visible', str(element_info.visible)]
-                ]
+            ['control_id', str(element_info.control_id)],
+            ['class_name', str(element_info.class_name)],
+            ['enabled', str(element_info.enabled)],
+            ['name', str(element_info.name)],
+            ['process_id', str(element_info.process_id)],
+            ['rectangle', str(element_info.rectangle)],
+            ['rich_text', str(element_info.rich_text)],
+            ['visible', str(element_info.visible)]
+        ] if (self.backend == 'ax') else [
+            ['control_id', str(element_info.control_id)],
+            ['class_name', str(element_info.class_name)],
+            ['enabled', str(element_info.enabled)],
+            ['handle', str(element_info.handle)],
+            ['name', str(element_info.name)],
+            ['process_id', str(element_info.process_id)],
+            ['rectangle', str(element_info.rectangle)],
+            ['rich_text', str(element_info.rich_text)],
+            ['visible', str(element_info.visible)]
+        ]
 
         props_win32 = [
         ] if (self.backend == 'win32') else []
