@@ -481,7 +481,7 @@ class MyWindow(QWidget):
         self.backend_menus[current_backend].menuAction().setVisible(True)
         for method in self.backend_methods[current_backend]['backend_methods'].keys():
             # if while not all implemented
-            if self.backend_methods[current_backend]['backend_methods'][method] != None:
+            if self.backend_methods[current_backend]['backend_methods'][method] is not None:
                 action = QAction(method + '()', self)
                 action.triggered.connect(
                     self.backend_methods[current_backend]['backend_methods'][method])
@@ -493,7 +493,7 @@ class MyWindow(QWidget):
             if wrapper in self.backend_methods[current_backend]['controls_methods'].keys():
                 for method in self.backend_methods[current_backend]['controls_methods'][wrapper].keys():
                     # if while not all implemented
-                    if self.backend_methods[current_backend]['controls_methods'][wrapper][method] != None:
+                    if self.backend_methods[current_backend]['controls_methods'][wrapper][method] is not None:
                         action = QAction(method + '()', self)
                         action.triggered.connect(
                             self.backend_methods[current_backend]['controls_methods'][wrapper][method])
