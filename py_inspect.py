@@ -365,14 +365,16 @@ class MyWindow(QWidget):
         self.backend_wrappers = {
             'win32': 'hwndwrapper.HwndWrapper',
             'uia': 'uiawrapper.UIAWrapper',
-            'ax': 'atspiwrapper.AtspiWrapper',
+            # TODO macos support
+            'ax': '',
             # TODO HOW TO ADD BACKEND
             'other backend': 'other backend wrapper name'
         }
         self.backend_inits = {
             'win32': pywinauto.controls.hwndwrapper.HwndWrapper,
             'uia': pywinauto.controls.uiawrapper.UIAWrapper,
-            'ax': pywinauto.controls.atspiwrapper.AtspiWrapper,
+            # TODO macos support
+            'ax': None,
             # TODO HOW TO ADD BACKEND
             'other backend': 'other backend wrapper class name'
         }
