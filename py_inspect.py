@@ -1,43 +1,48 @@
-import pywinauto
-from pywinauto import backend
-from PyQt5.QtCore import QLocale
-from PyQt5.QtCore import QCoreApplication
-from PyQt5.QtCore import QSettings
-from PyQt5.QtCore import Qt
-from PyQt5.QtCore import QAbstractTableModel
-from PyQt5.QtCore import QVariant
-from PyQt5.QtGui import QStandardItemModel
-from PyQt5.QtGui import QStandardItem
-from PyQt5.QtGui import QIntValidator
-from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtWidgets import QWidget
-from PyQt5.QtWidgets import QGridLayout
-from PyQt5.QtWidgets import QHBoxLayout
-from PyQt5.QtWidgets import QVBoxLayout
-from PyQt5.QtWidgets import QLabel
-from PyQt5.QtWidgets import QComboBox
-from PyQt5.QtWidgets import QTreeView
-from PyQt5.QtWidgets import QTableView
-from PyQt5.QtWidgets import QMenuBar
-from PyQt5.QtWidgets import QAction
-from PyQt5.QtWidgets import QListView
-from PyQt5.QtWidgets import QDialog
-from PyQt5.QtWidgets import QLineEdit
-from PyQt5.QtWidgets import QGroupBox
-from PyQt5.QtWidgets import QRadioButton
-from PyQt5.QtWidgets import QVBoxLayout
-from PyQt5.QtWidgets import QPushButton
-from PyQt5.QtWidgets import QCheckBox
-from PyQt5.QtWidgets import QMessageBox
-from PyQt5.QtWidgets import QTextEdit
-from PyQt5.QtWidgets import QFileDialog
-from PyQt5.QtWidgets import QHeaderView
 import sys
 import warnings
-
 warnings.simplefilter("ignore", UserWarning)
 sys.coinit_flags = 2
+import pywinauto
+import threading
+import time
+import win32api
+from PyQt5.QtWidgets import QHeaderView
+from PyQt5.QtWidgets import QFileDialog
+from PyQt5.QtWidgets import QTextEdit
+from PyQt5.QtWidgets import QMessageBox
+from PyQt5.QtWidgets import QCheckBox
+from PyQt5.QtWidgets import QPushButton
+from PyQt5.QtWidgets import QRadioButton
+from PyQt5.QtWidgets import QGroupBox
+from PyQt5.QtWidgets import QLineEdit
+from PyQt5.QtWidgets import QDialog
+from PyQt5.QtWidgets import QListView
+from PyQt5.QtWidgets import QAction
+from PyQt5.QtWidgets import QMenuBar
+from PyQt5.QtWidgets import QTableView
+from PyQt5.QtWidgets import QTreeView
+from PyQt5.QtWidgets import QComboBox
+from PyQt5.QtWidgets import QLabel
+from PyQt5.QtWidgets import QVBoxLayout
+from PyQt5.QtWidgets import QHBoxLayout
+from PyQt5.QtWidgets import QGridLayout
+from PyQt5.QtWidgets import QWidget
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QShortcut
+from PyQt5.QtWidgets import QAbstractItemView
+from PyQt5.QtGui import QKeySequence
+from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QIntValidator
+from PyQt5.QtGui import QStandardItem
+from PyQt5.QtGui import QStandardItemModel
+from PyQt5.QtCore import QVariant
+from PyQt5.QtCore import QAbstractTableModel
+from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QSettings
+from PyQt5.QtCore import QCoreApplication
+from PyQt5.QtCore import QLocale
+from PyQt5.QtCore import QItemSelectionModel
+from pywinauto import backend
 
 
 def main():
@@ -142,19 +147,129 @@ class ClickInput(QDialog):
             self.close()
 
 
+class MyTreeModel(QStandardItemModel):
+    def __init__(self, element_info, backend):
+        QStandardItemModel.__init__(self)
+        root_node = self.invisibleRootItem()
+        self.props_dict = {}
+        self.info_dict = {}
+        self.tree_dict = {}
+        self.tree_dict.update({str(element_info): 0})
+        self.backend = backend
+        self.branch = QStandardItem(self.__node_name(element_info))
+        self.branch.setEditable(False)
+        root_node.appendRow(self.branch)
+        self.__generate_props_dict(element_info)
+        self.__get_next(element_info, self.branch)
+
+    def __get_next(self, element_info, parent):
+        child_index = 0
+        for child in element_info.children():
+            self.tree_dict.update({str(child): child_index})
+            child_index += 1
+            self.__generate_props_dict(child)
+            child_item \
+                = QStandardItem(self.__node_name(child))
+            child_item.setEditable(False)
+            parent.appendRow(child_item)
+            self.__get_next(child, child_item)
+
+    def __node_name(self, element_info):
+        if 'uia' == self.backend:
+            return '%s "%s" (%s)' % (str(element_info.control_type),
+                                     str(element_info.name),
+                                     id(element_info))
+        return '"%s" (%s)' % (str(element_info.name), id(element_info))
+
+    def __generate_props_dict(self, element_info):
+        props = [
+            ['control_id', str(element_info.control_id)],
+            ['class_name', str(element_info.class_name)],
+            ['enabled', str(element_info.enabled)],
+            ['name', str(element_info.name)],
+            ['process_id', str(element_info.process_id)],
+            ['rectangle', str(element_info.rectangle)],
+            ['rich_text', str(element_info.rich_text)],
+            ['visible', str(element_info.visible)]
+        ] if (self.backend == 'ax') else [
+            ['control_id', str(element_info.control_id)],
+            ['class_name', str(element_info.class_name)],
+            ['enabled', str(element_info.enabled)],
+            ['handle', str(element_info.handle)],
+            ['name', str(element_info.name)],
+            ['process_id', str(element_info.process_id)],
+            ['rectangle', str(element_info.rectangle)],
+            ['rich_text', str(element_info.rich_text)],
+            ['visible', str(element_info.visible)]
+        ]
+
+        props_win32 = [
+        ] if (self.backend == 'win32') else []
+
+        props_uia = [
+            ['auto_id', str(element_info.auto_id)],
+            ['control_type', str(element_info.control_type)],
+            ['element', str(element_info.element)],
+            ['framework_id', str(element_info.framework_id)],
+            ['runtime_id', str(element_info.runtime_id)],
+            ['access_key', str(element_info.access_key)],
+            ['legacy_action', str(element_info.legacy_action)],
+            ['legacy_descr', str(element_info.legacy_descr)],
+            ['legacy_help', str(element_info.legacy_help)],
+            ['legacy_name', str(element_info.legacy_name)],
+            ['legacy_shortcut', str(element_info.legacy_shortcut)],
+            ['legacy_value', str(element_info.legacy_value)],
+            ['accelerator', str(element_info.accelerator)],
+            ['value', str(element_info.value)],
+            ['parent', str(element_info.parent)],
+            ['top_level_parent', str(element_info.top_level_parent)]
+        ] if (self.backend == 'uia') else []
+
+        props.extend(props_uia)
+        props.extend(props_win32)
+        node_dict = {self.__node_name(element_info): props}
+        self.props_dict.update(node_dict)
+        self.info_dict.update({self.__node_name(element_info): element_info})
+
+
+class MyTableModel(QAbstractTableModel):
+    def __init__(self, datain, parent=None, *args):
+        QAbstractTableModel.__init__(self, parent, *args)
+        self.arraydata = datain
+        self.header_labels = ['Property', 'Value']
+
+    def rowCount(self, parent):
+        return len(self.arraydata)
+
+    def columnCount(self, parent):
+        return len(self.arraydata[0])
+
+    def data(self, index, role):
+        if not index.isValid():
+            return QVariant()
+        elif role != Qt.DisplayRole:
+            return QVariant()
+        return QVariant(self.arraydata[index.row()][index.column()])
+
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+            return self.header_labels[section]
+        return QAbstractTableModel.headerData(self, section, orientation, role)
+
+
 class MyWindow(QWidget):
     def __init__(self):
         super(MyWindow, self).__init__()
 
         # Methods
         self.base_methods = {
-            # TODO remove overriden methods
+            # TODO remove overriden methods capture_as_image and draw_outline
             # 'capture_as_image': self.__capture_as_image,
             'children': self.__children,
             'click_input': self.__click_input,
             'close': self.__close,
             'descendants': self.__descendants,
-            # 'draw_outline': self.__draw_outline,
+            'draw_outline': self.__draw_outline,
             'set_focus': self.__set_focus,
             'texts': self.__texts,
             'type_keys': self.__type_keys,
@@ -336,11 +451,28 @@ class MyWindow(QWidget):
         # Menu bar
         self.menu_bar = QMenuBar(self)
         self.action = self.menu_bar.addMenu("Actions")
-        self.mouse = QAction('Find by mouse', self)
+
+        self.mouse = QAction('Enable searching (hotkey "S")', self)
         self.mouse.setCheckable(True)
+        self.shortcut_mouse = QShortcut(QKeySequence("S"), self)
+        self.shortcut_mouse.activated.connect(self.__use_thread)
+        self.draw = QAction('Draw control rectangle (hotkey "D")', self)
+        self.draw.setCheckable(True)
+        self.draw.setChecked(True)
+        self.shortcut_draw = QShortcut(QKeySequence("D"), self)
+        self.shortcut_draw.activated.connect(self.__draw_rect)
+
+        self.index_path = []
+        self.search_end = False
+        self.mouse_thread = threading.Thread(
+            target=self.__lookForMouse, args=(), daemon=True)
+        self.mouse_thread.start()
+
         default = QAction('Default Action', self)
         default.triggered.connect(self.__default)
-        self.action.addAction(self.mouse)
+        self.findbm = self.action.addMenu("Find control by mouse")
+        self.findbm.addAction(self.mouse)
+        self.findbm.addAction(self.draw)
         self.action.addAction(default)
         self.action.addSeparator()
 
@@ -401,10 +533,12 @@ class MyWindow(QWidget):
         if sys.platform == 'darwin':
             self.comboBox.addItem('ax')
             self.__initialize_calc('ax')
+            self.current_backend = 'ax'
         else:
             for _backend in backend.registry.backends.keys():
                 self.comboBox.addItem(_backend)
             self.comboBox.setCurrentText('uia')
+            self.current_backend = 'uia'
             self.__initialize_calc()
 
         # Code generator
@@ -457,18 +591,18 @@ class MyWindow(QWidget):
         self.tree_model = MyTreeModel(self.element_info, _backend)
         self.tree_model.setHeaderData(0, Qt.Horizontal, 'Controls')
         self.tree_view.setModel(self.tree_model)
+        self.tree_view.setSelectionMode(QAbstractItemView.SingleSelection)
 
-    def __show_tree(self, text):
-        backend = text
-        if str(self.comboBox.currentText()) != backend:
+    def __show_tree(self, backend):
+        if backend != self.current_backend:
+            self.current_backend = backend
             self.current_elem_wrapper = None
-            self.__initialize_calc(backend)
+            self.__initialize_calc(self.current_backend)
 
     def __show_property(self, index=None):
         data = index.data()
-        current_backend = self.comboBox.currentText()
         self.current_elem_info = self.tree_model.info_dict.get(data)
-        self.current_elem_wrapper = self.backend_inits[current_backend](
+        self.current_elem_wrapper = self.backend_inits[self.current_backend](
             self.current_elem_info)
 
         self.bmethods.clear()
@@ -478,27 +612,27 @@ class MyWindow(QWidget):
             self.bmethods.addAction(action)
 
         self.backend_menus['last_used'].menuAction().setVisible(False)
-        self.backend_menus['last_used'] = self.backend_menus[current_backend]
-        self.backend_menus[current_backend].clear()
-        self.backend_menus[current_backend].menuAction().setVisible(True)
-        for method in self.backend_methods[current_backend]['backend_methods'].keys():
+        self.backend_menus['last_used'] = self.backend_menus[self.current_backend]
+        self.backend_menus[self.current_backend].clear()
+        self.backend_menus[self.current_backend].menuAction().setVisible(True)
+        for method in self.backend_methods[self.current_backend]['backend_methods'].keys():
             # if while not all implemented
-            if self.backend_methods[current_backend]['backend_methods'][method] is not None:
+            if self.backend_methods[self.current_backend]['backend_methods'][method] is not None:
                 action = QAction(method + '()', self)
                 action.triggered.connect(
-                    self.backend_methods[current_backend]['backend_methods'][method])
-                self.backend_menus[current_backend].addAction(action)
+                    self.backend_methods[self.current_backend]['backend_methods'][method])
+                self.backend_menus[self.current_backend].addAction(action)
 
         wrapper = str(self.current_elem_wrapper).split('-')[0][:-1]
-        if wrapper != self.backend_wrappers[current_backend]:
+        if wrapper != self.backend_wrappers[self.current_backend]:
             self.cmethods.clear()
-            if wrapper in self.backend_methods[current_backend]['controls_methods'].keys():
-                for method in self.backend_methods[current_backend]['controls_methods'][wrapper].keys():
+            if wrapper in self.backend_methods[self.current_backend]['controls_methods'].keys():
+                for method in self.backend_methods[self.current_backend]['controls_methods'][wrapper].keys():
                     # if while not all implemented
-                    if self.backend_methods[current_backend]['controls_methods'][wrapper][method] is not None:
+                    if self.backend_methods[self.current_backend]['controls_methods'][wrapper][method] is not None:
                         action = QAction(method + '()', self)
                         action.triggered.connect(
-                            self.backend_methods[current_backend]['controls_methods'][wrapper][method])
+                            self.backend_methods[self.current_backend]['controls_methods'][wrapper][method])
                         self.cmethods.addAction(action)
             else:
                 dlg = InfoDialog('Not implemented yet',
@@ -515,7 +649,7 @@ class MyWindow(QWidget):
     def __refresh(self):
         self.current_elem_wrapper = None
         self.tree_model = MyTreeModel(
-            self.element_info, str(self.comboBox.currentText()))
+            self.element_info, str(self.current_backend))
         self.tree_model.setHeaderData(0, Qt.Horizontal, 'Controls')
         self.tree_view.setModel(self.tree_model)
 
@@ -557,11 +691,11 @@ class MyWindow(QWidget):
                     # TODO same as start mode
                     args = 'cannot find app'
                 self.edit.append(self.used_apps[top_parent.process_id] +
-                                 ' = Application(backend="{}").connect({})\n'.format(self.comboBox.currentText(), args))
+                                 ' = Application(backend="{}").connect({})\n'.format(self.current_backend, args))
             elif self.script_mode.currentText() == 'start .exe mode':
                 # TODO start correct app name
                 self.edit.append(self.used_apps[top_parent.process_id] + ' = Application(backend="{}").start("{}")\n'.format(
-                    self.comboBox.currentText(), 'type correct argument for start()'))
+                    self.current_backend, 'type correct argument for start()'))
         command = str(self.used_apps[top_parent.process_id])
         # TODO try optimal search for controls with pre-run script
         window = path[len(path)-1]
@@ -574,7 +708,7 @@ class MyWindow(QWidget):
         if window.control_id:
             window_props += 'control_id="{}", '.format(window.control_id)
         if window_props == '':
-            if self.comboBox.currentText() == 'uia':
+            if self.current_backend == 'uia':
                 if window.control_type:
                     window_props += 'control_type="{}", '.format(
                         window.control_type)
@@ -598,7 +732,7 @@ class MyWindow(QWidget):
             if ctrl.control_id:
                 ctrl_props += 'control_id="{}", '.format(ctrl.control_id)
             if ctrl_props == '':
-                if self.comboBox.currentText() == 'uia':
+                if self.current_backend == 'uia':
                     if ctrl.control_type:
                         ctrl_props += 'control_type="{}", '.format(
                             ctrl.control_type)
@@ -629,9 +763,84 @@ class MyWindow(QWidget):
 
     # Actions
 
+    def __use_thread(self):
+        if self.mouse.isChecked():
+            self.mouse.setChecked(False)
+        else:
+            self.mouse.setChecked(True)
+
+    def __draw_rect(self):
+        if self.draw.isChecked():
+            self.draw.setChecked(False)
+        else:
+            self.draw.setChecked(True)
+
+    def __node_name(self, element_info):
+        if 'uia' == self.current_backend:
+            return '%s "%s" (%s)' % (str(element_info.control_type),
+                                     str(element_info.name),
+                                     id(element_info))
+        return '"%s" (%s)' % (str(element_info.name), id(element_info))
+
+    def __next(self, parent, target):
+        if parent.hasChildren():
+            child_count = parent.rowCount()
+            for i in range(child_count):
+                if self.search_end:
+                    return
+                if parent.child(i, 0).text() == self.__node_name(target):
+                    self.index_path.append(
+                        self.tree_model.index(i, 0, parent.index()))
+                    self.search_end = True
+                    return
+                else:
+                    self.index_path.append(
+                        self.tree_model.index(i, 0, parent.index()))
+                    self.__next(parent.child(i, 0), target)
+        if not self.search_end:
+            self.index_path.pop()
+
+    # TODO use hooks + start when used and kill when not
+    def __lookForMouse(self):
+        desktop = pywinauto.Desktop(backend=self.current_backend)
+        while True:
+            time.sleep(0.5)
+            if self.mouse.isChecked():
+                x, y = win32api.GetCursorPos()
+                control_wrapper = desktop.from_point(x, y)
+                if control_wrapper != self.current_elem_wrapper:
+                    if self.draw.isChecked():
+                        control_wrapper.draw_outline()
+                    for key in self.tree_model.info_dict.keys():
+                        item_elem_info = self.tree_model.info_dict.get(key)
+                        item_wrapper = self.backend_inits[self.current_backend](
+                            item_elem_info)
+                        if control_wrapper == item_wrapper:
+                            # Expand
+                            root = self.tree_model.itemFromIndex(
+                                self.tree_model.index(0, 0))
+                            self.search_end = False
+                            self.index_path.clear()
+                            self.index_path.append(root.index())
+
+                            self.__next(root, item_elem_info)
+
+                            for index in self.index_path[:-1]:
+                                self.tree_view.setExpanded(index, True)
+
+                            # Select
+                            self.tree_view.selectionModel().clearSelection()
+                            self.tree_view.selectionModel().select(
+                                self.index_path[-1], QItemSelectionModel.SelectionFlag.Select)
+
+                            # Update
+                            self.__show_property(self.index_path[-1])
+
+                            break
+
     def __default(self):
         # TODO add write method?
-        if self.comboBox.currentText() == 'uia':
+        if self.current_backend == 'uia':
             if self.current_elem_info.legacy_action != '':
                 self.current_elem_wrapper.iface_legacy_iaccessible.DoDefaultAction()
             else:
@@ -695,8 +904,8 @@ class MyWindow(QWidget):
         dlg.exec()
         self.__write_method('descendants()', 'print')
 
-    # def __draw_outline(self):
-    #    self.current_elem_wrapper.draw_outline()
+    def __draw_outline(self):
+        self.current_elem_wrapper.draw_outline()
 
     def __set_focus(self):
         self.__write_method('set_focus()', 'execute')
@@ -994,111 +1203,6 @@ class MyWindow(QWidget):
     # AX Wrapper Methods
 
     # AX Controls Wrappers Methods
-
-
-class MyTreeModel(QStandardItemModel):
-    def __init__(self, element_info, backend):
-        QStandardItemModel.__init__(self)
-        root_node = self.invisibleRootItem()
-        self.props_dict = {}
-        self.info_dict = {}
-        self.backend = backend
-        self.branch = QStandardItem(self.__node_name(element_info))
-        self.branch.setEditable(False)
-        root_node.appendRow(self.branch)
-        self.__generate_props_dict(element_info)
-        self.__get_next(element_info, self.branch)
-
-    def __get_next(self, element_info, parent):
-        for child in element_info.children():
-            self.__generate_props_dict(child)
-            child_item \
-                = QStandardItem(self.__node_name(child))
-            child_item.setEditable(False)
-            parent.appendRow(child_item)
-            self.__get_next(child, child_item)
-
-    def __node_name(self, element_info):
-        if 'uia' == self.backend:
-            return '%s "%s" (%s)' % (str(element_info.control_type),
-                                     str(element_info.name),
-                                     id(element_info))
-        return '"%s" (%s)' % (str(element_info.name), id(element_info))
-
-    def __generate_props_dict(self, element_info):
-        props = [
-            ['control_id', str(element_info.control_id)],
-            ['class_name', str(element_info.class_name)],
-            ['enabled', str(element_info.enabled)],
-            ['name', str(element_info.name)],
-            ['process_id', str(element_info.process_id)],
-            ['rectangle', str(element_info.rectangle)],
-            ['rich_text', str(element_info.rich_text)],
-            ['visible', str(element_info.visible)]
-        ] if (self.backend == 'ax') else [
-            ['control_id', str(element_info.control_id)],
-            ['class_name', str(element_info.class_name)],
-            ['enabled', str(element_info.enabled)],
-            ['handle', str(element_info.handle)],
-            ['name', str(element_info.name)],
-            ['process_id', str(element_info.process_id)],
-            ['rectangle', str(element_info.rectangle)],
-            ['rich_text', str(element_info.rich_text)],
-            ['visible', str(element_info.visible)]
-        ]
-
-        props_win32 = [
-        ] if (self.backend == 'win32') else []
-
-        props_uia = [
-            ['auto_id', str(element_info.auto_id)],
-            ['control_type', str(element_info.control_type)],
-            ['element', str(element_info.element)],
-            ['framework_id', str(element_info.framework_id)],
-            ['runtime_id', str(element_info.runtime_id)],
-            ['access_key', str(element_info.access_key)],
-            ['legacy_action', str(element_info.legacy_action)],
-            ['legacy_descr', str(element_info.legacy_descr)],
-            ['legacy_help', str(element_info.legacy_help)],
-            ['legacy_name', str(element_info.legacy_name)],
-            ['legacy_shortcut', str(element_info.legacy_shortcut)],
-            ['legacy_value', str(element_info.legacy_value)],
-            ['accelerator', str(element_info.accelerator)],
-            ['value', str(element_info.value)],
-            ['parent', str(element_info.parent)],
-            ['top_level_parent', str(element_info.top_level_parent)]
-        ] if (self.backend == 'uia') else []
-
-        props.extend(props_uia)
-        props.extend(props_win32)
-        node_dict = {self.__node_name(element_info): props}
-        self.props_dict.update(node_dict)
-        self.info_dict.update({self.__node_name(element_info): element_info})
-
-
-class MyTableModel(QAbstractTableModel):
-    def __init__(self, datain, parent=None, *args):
-        QAbstractTableModel.__init__(self, parent, *args)
-        self.arraydata = datain
-        self.header_labels = ['Property', 'Value']
-
-    def rowCount(self, parent):
-        return len(self.arraydata)
-
-    def columnCount(self, parent):
-        return len(self.arraydata[0])
-
-    def data(self, index, role):
-        if not index.isValid():
-            return QVariant()
-        elif role != Qt.DisplayRole:
-            return QVariant()
-        return QVariant(self.arraydata[index.row()][index.column()])
-
-    def headerData(self, section, orientation, role=Qt.DisplayRole):
-        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
-            return self.header_labels[section]
-        return QAbstractTableModel.headerData(self, section, orientation, role)
 
 
 if __name__ == "__main__":
