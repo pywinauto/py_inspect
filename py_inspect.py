@@ -162,7 +162,7 @@ class MyTreeModel(QStandardItemModel):
                       ] if (self.backend == 'win32') else []
 
         props_uia = [
-                        ['automation_id', str(element_info.automation_id)],
+                        ['automation_id', str(element_info.automation_id) if hasattr(element_info, 'automation_id') else str(element_info.auto_id)],
                         ['control_type', str(element_info.control_type)],
                         ['element', str(element_info.element)],
                         ['framework_id', str(element_info.framework_id)],
